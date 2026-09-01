@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  labels:
+    app: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      # Credenciales para que kubelet haga pull desde ECR.
+      # El token expira a las 12h: hay que recrear el secret.
+      imagePullSecrets:
+        - name: ecr-creds
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000   # python:3.14-slim no trae el uid 101 de nginx
+
+      containers:
+        - name: http-service
+          image: xxxxxxxxxxx.dkr.ecr.us-east-1.amazonaws.com/xxxxxxxx:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 5001   # app.py -> app.run(port=5001)
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+
+          # ConfigMap como variables de entorno.
+          # Claves explicitas para no inyectar tambien index.html
+          # ni nginx-default.conf, que son archivos, no valores.
+          env:
+            - name: APP_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: web-config
+                  key: APP_ENV
+            - name: APP_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: web-config
+                  key: APP_REGION
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: web-config
+                  key: LOG_LEVEL
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10

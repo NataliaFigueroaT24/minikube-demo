@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: demo
+data:
+  # 1) Pares clave/valor -> se consumen como variables de entorno
+  APP_ENV: "local"
+  APP_REGION: "us-east-1"
+  LOG_LEVEL: "debug"
+
+  
